@@ -49,20 +49,49 @@ export default function AIStudio() {
     setIsGenerating(true);
 
     try {
-      // TODO: Call OpenAI API endpoint
-      // Simulating API call for now
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const response = await fetch('/api/ai/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt: prompt.trim(),
+          tone: selectedTone,
+          platforms: selectedPlatforms,
+        }),
+        credentials: 'include',
+      });
 
-      setGeneratedContent(`[${selectedTone.toUpperCase()} TONE]\n\n${prompt}\n\nThis is where the AI-generated content will appear. The content will be optimized for: ${selectedPlatforms.join(', ')}\n\n#SocialMedia #ContentCreation #AI`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        // Handle specific error for missing API key
+        if (response.status === 503) {
+          toast({
+            title: 'OpenAI API Key Required',
+            description: data.message || 'Please configure your OpenAI API key in .env file',
+            variant: 'destructive',
+          });
+
+          // Show helpful message in the content area
+          setGeneratedContent('⚠️ OpenAI API Key Not Configured\n\nTo enable AI content generation:\n\n1. Get your API key from https://platform.openai.com/api-keys\n2. Add it to your .env file:\n   OPENAI_API_KEY=sk-your-key-here\n3. Restart the server\n\nOnce configured, you\'ll be able to generate AI-powered content for all your social media platforms!');
+          return;
+        }
+
+        throw new Error(data.message || 'Failed to generate content');
+      }
+
+      setGeneratedContent(data.content || '');
 
       toast({
         title: 'Content generated!',
         description: 'Your AI content is ready',
       });
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Generation error:', error);
       toast({
         title: 'Generation failed',
-        description: 'Failed to generate content. Please try again.',
+        description: error.message || 'Failed to generate content. Please try again.',
         variant: 'destructive',
       });
     } finally {
