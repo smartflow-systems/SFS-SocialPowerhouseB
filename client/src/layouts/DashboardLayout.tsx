@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/sidebar';
 import {
   Home, Sparkles, Calendar, BarChart3, Users, Settings,
-  Zap, Bell, CreditCard, HelpCircle, FileText, Globe
+  Zap, Bell, CreditCard, HelpCircle, FileText, Globe, CheckCircle
 } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 
@@ -39,6 +39,7 @@ const accountsItems = [
 
 const settingsItems = [
   { icon: Users, label: "Team", path: "/team" },
+  { icon: CheckCircle, label: "Approvals", path: "/approvals" },
   { icon: Settings, label: "Settings", path: "/settings" },
   { icon: CreditCard, label: "Billing", path: "/billing" },
   { icon: HelpCircle, label: "Help", path: "/help" },
