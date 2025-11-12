@@ -19,8 +19,23 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      // TODO: Implement actual authentication
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+        credentials: 'include', // Important for session cookies
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Login failed');
+      }
 
       toast({
         title: 'Welcome back!',
@@ -28,10 +43,10 @@ export default function Login() {
       });
 
       setLocation('/dashboard');
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: 'Login failed',
-        description: 'Invalid email or password',
+        description: error.message || 'Invalid email or password',
         variant: 'destructive',
       });
     } finally {

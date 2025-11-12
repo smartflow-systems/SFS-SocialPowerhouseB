@@ -34,11 +34,37 @@ export default function Register() {
       return;
     }
 
+    if (formData.password.length < 8) {
+      toast({
+        title: 'Password too short',
+        description: 'Password must be at least 8 characters long',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      // TODO: Implement actual registration
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          username: formData.email.split('@')[0], // Use email prefix as username
+          password: formData.password,
+        }),
+        credentials: 'include', // Important for session cookies
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Registration failed');
+      }
 
       toast({
         title: 'Welcome to SFS PowerHouse!',
@@ -46,10 +72,10 @@ export default function Register() {
       });
 
       setLocation('/dashboard');
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: 'Registration failed',
-        description: 'Something went wrong. Please try again.',
+        description: error.message || 'Something went wrong. Please try again.',
         variant: 'destructive',
       });
     } finally {
