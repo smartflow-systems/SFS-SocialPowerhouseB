@@ -5,6 +5,7 @@ import aiRouter from "./api/ai";
 import passport from "passport";
 import { requireAuth } from "./auth";
 import type { User } from "@shared/schema";
+import { publishPost, processScheduledPosts, validatePostForPlatform } from "./publisher";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication Routes
@@ -485,6 +486,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({
         error: "Failed to record usage",
         message: error.message || "An error occurred"
+      });
+    }
+  });
+
+  // Publishing API Routes
+  // Manually publish a post immediately
+  app.post("/api/posts/:id/publish", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { id } = req.params;
+
+      const post = await storage.getPost(id);
+      if (!post) {
+        return res.status(404).json({
+          error: "Post not found",
+          message: "The requested post does not exist"
+        });
+      }
+
+      // Verify post belongs to user
+      if (post.userId !== user.id) {
+        return res.status(403).json({
+          error: "Access denied",
+          message: "You do not have permission to publish this post"
+        });
+      }
+
+      // Validate content for each platform
+      const validationErrors: string[] = [];
+      for (const platform of post.platforms) {
+        const validation = validatePostForPlatform(post.content, platform);
+        if (!validation.valid) {
+          validationErrors.push(`${platform}: ${validation.error}`);
+        }
+      }
+
+      if (validationErrors.length > 0) {
+        return res.status(400).json({
+          error: "Validation failed",
+          message: "Post content violates platform requirements",
+          validationErrors
+        });
+      }
+
+      // Publish the post
+      const result = await publishPost(post);
+
+      res.json({
+        message: result.success ? "Post published successfully" : "Post publishing completed with errors",
+        success: result.success,
+        results: result.results,
+      });
+    } catch (error: any) {
+      console.error("Error publishing post:", error);
+      res.status(500).json({
+        error: "Failed to publish post",
+        message: error.message || "An error occurred while publishing the post"
+      });
+    }
+  });
+
+  // Manually trigger the scheduled posts processor (admin/testing)
+  app.post("/api/publisher/process", requireAuth, async (req, res) => {
+    try {
+      await processScheduledPosts();
+      res.json({ message: "Scheduled posts processed" });
+    } catch (error: any) {
+      console.error("Error processing scheduled posts:", error);
+      res.status(500).json({
+        error: "Failed to process scheduled posts",
+        message: error.message || "An error occurred"
+      });
+    }
+  });
+
+  // Validate post content for platforms
+  app.post("/api/posts/validate", requireAuth, async (req, res) => {
+    try {
+      const { content, platforms } = req.body;
+
+      if (!content || !platforms || !Array.isArray(platforms)) {
+        return res.status(400).json({
+          error: "Missing required fields",
+          message: "Content and platforms array are required"
+        });
+      }
+
+      const validationResults: Record<string, { valid: boolean; error?: string }> = {};
+
+      for (const platform of platforms) {
+        validationResults[platform] = validatePostForPlatform(content, platform);
+      }
+
+      const allValid = Object.values(validationResults).every(r => r.valid);
+
+      res.json({
+        valid: allValid,
+        results: validationResults,
+      });
+    } catch (error: any) {
+      console.error("Error validating post:", error);
+      res.status(500).json({
+        error: "Validation failed",
+        message: error.message || "An error occurred during validation"
       });
     }
   });

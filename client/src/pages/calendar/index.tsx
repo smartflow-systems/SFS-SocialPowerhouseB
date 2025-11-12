@@ -20,7 +20,8 @@ import {
   List,
   Clock,
   Sparkles,
-  Loader2
+  Loader2,
+  Send
 } from 'lucide-react';
 import {
   Dialog,
@@ -291,6 +292,58 @@ export default function Calendar() {
     }
   };
 
+  const handlePublishPost = async (postId: string) => {
+    try {
+      const response = await fetch(`/api/posts/${postId}/publish`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        // Show validation errors if present
+        if (data.validationErrors) {
+          toast({
+            title: 'Validation Failed',
+            description: data.validationErrors.join(', '),
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        throw new Error(data.message || 'Failed to publish post');
+      }
+
+      // Show success or partial success message
+      if (data.success) {
+        const publishedCount = Object.values(data.results).filter((r: any) => r.success).length;
+        toast({
+          title: 'Post Published!',
+          description: `Successfully published to ${publishedCount} platform(s)`,
+        });
+      } else {
+        const successCount = Object.values(data.results).filter((r: any) => r.success).length;
+        const failCount = Object.values(data.results).filter((r: any) => !r.success).length;
+
+        toast({
+          title: 'Partial Success',
+          description: `Published to ${successCount} platform(s), failed on ${failCount}`,
+          variant: 'destructive',
+        });
+      }
+
+      // Refresh posts list to update status
+      fetchPosts();
+    } catch (error: any) {
+      toast({
+        title: 'Publishing Failed',
+        description: error.message || 'Failed to publish post',
+        variant: 'destructive',
+      });
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -514,6 +567,17 @@ export default function Calendar() {
                     </p>
                   </div>
                   <div className="flex gap-2">
+                    {(post.status === 'draft' || post.status === 'scheduled') && (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => handlePublishPost(post.id)}
+                        className="bg-primary hover:bg-primary/90"
+                      >
+                        <Send className="w-3 h-3 mr-1" />
+                        Publish Now
+                      </Button>
+                    )}
                     <Button variant="outline" size="sm">Edit</Button>
                     <Button
                       variant="outline"
