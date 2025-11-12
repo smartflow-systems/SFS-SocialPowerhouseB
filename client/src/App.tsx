@@ -23,15 +23,23 @@ import Drafts from "@/pages/posts/drafts";
 import Templates from "@/pages/templates/index";
 
 // Connection Pages
-import SocialAccounts from "@/pages/connections/accounts";
+import SocialAccounts from "@/pages/connections/social-accounts";
 import TeamMembers from "@/pages/connections/team";
 import Integrations from "@/pages/connections/integrations";
+import Automation from "@/pages/connections/automation";
+import Alerts from "@/pages/connections/alerts";
 
 // Settings Pages
 import Profile from "@/pages/settings/profile";
 import Billing from "@/pages/settings/billing";
 import Notifications from "@/pages/settings/notifications";
 import Preferences from "@/pages/settings/preferences";
+
+// Scheduler
+import Scheduler from "@/pages/scheduler/index";
+
+// Help
+import Help from "@/pages/help/index";
 
 function Router() {
   return (
@@ -63,16 +71,24 @@ function Router() {
       <Route path="/posts/drafts" component={Drafts} />
       <Route path="/templates" component={Templates} />
 
+      {/* Scheduler Route */}
+      <Route path="/scheduler" component={Scheduler} />
+
       {/* Connection Routes */}
-      <Route path="/connections/accounts" component={SocialAccounts} />
+      <Route path="/connections/social-accounts" component={SocialAccounts} />
       <Route path="/connections/team" component={TeamMembers} />
       <Route path="/connections/integrations" component={Integrations} />
+      <Route path="/connections/automation" component={Automation} />
+      <Route path="/connections/alerts" component={Alerts} />
 
       {/* Settings Routes */}
       <Route path="/settings/profile" component={Profile} />
       <Route path="/settings/billing" component={Billing} />
       <Route path="/settings/notifications" component={Notifications} />
       <Route path="/settings/preferences" component={Preferences} />
+
+      {/* Help Route */}
+      <Route path="/help" component={Help} />
 
       {/* Catch all - 404 */}
       <Route component={NotFound} />
