@@ -16,6 +16,7 @@ import Analytics from "@/pages/analytics/index";
 import ContentLibrary from "@/pages/content-library/index";
 
 // Content Pages
+import PostsList from "@/pages/posts/index";
 import CreatePost from "@/pages/posts/create";
 import ScheduledPosts from "@/pages/posts/scheduled";
 import Drafts from "@/pages/posts/drafts";
@@ -25,6 +26,11 @@ import Templates from "@/pages/templates/index";
 import SocialAccounts from "@/pages/connections/accounts";
 import TeamMembers from "@/pages/connections/team";
 import Integrations from "@/pages/connections/integrations";
+
+// Team & Approval Pages
+import AccountsPage from "@/pages/accounts/index";
+import TeamPage from "@/pages/team/index";
+import ApprovalsPage from "@/pages/approvals/index";
 
 // Settings Pages
 import Profile from "@/pages/settings/profile";
@@ -54,6 +60,7 @@ function Router() {
       <Route path="/ai/generator" component={AIStudio} />
 
       {/* Content Routes */}
+      <Route path="/posts" component={PostsList} />
       <Route path="/posts/create" component={CreatePost} />
       <Route path="/posts/scheduled" component={ScheduledPosts} />
       <Route path="/posts/drafts" component={Drafts} />
@@ -63,6 +70,11 @@ function Router() {
       <Route path="/connections/accounts" component={SocialAccounts} />
       <Route path="/connections/team" component={TeamMembers} />
       <Route path="/connections/integrations" component={Integrations} />
+
+      {/* Team & Collaboration Routes */}
+      <Route path="/accounts" component={AccountsPage} />
+      <Route path="/team" component={TeamPage} />
+      <Route path="/approvals" component={ApprovalsPage} />
 
       {/* Settings Routes */}
       <Route path="/settings/profile" component={Profile} />
