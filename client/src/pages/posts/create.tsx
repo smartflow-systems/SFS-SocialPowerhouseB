@@ -114,9 +114,9 @@ export default function CreatePost() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-4">
         <div>
-          <h1 className="text-3xl font-bold mb-2 flex items-center gap-2" data-testid="heading-create-post">
+          <h1 className="text-2xl font-bold text-sfs-gold mb-2 flex items-center gap-2" data-testid="heading-create-post">
             <PenSquare className="w-8 h-8 text-primary" />
             Create Post
           </h1>
@@ -126,9 +126,9 @@ export default function CreatePost() {
         </div>
 
         <Form {...form}>
-          <form className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
-              <Card className="glass-card p-6">
+          <form className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2 space-y-4">
+              <Card className="glass-card p-4">
                 <div className="space-y-4">
                   <FormField
                     control={form.control}
@@ -151,7 +151,7 @@ export default function CreatePost() {
                 </div>
               </Card>
 
-              <Card className="glass-card p-6">
+              <Card className="glass-card p-4">
                 <h2 className="text-lg font-semibold mb-4">Preview</h2>
                 <div className="border border-border rounded-lg p-4 min-h-32">
                   <p className="text-muted-foreground whitespace-pre-wrap">
@@ -161,8 +161,8 @@ export default function CreatePost() {
               </Card>
             </div>
 
-            <div className="space-y-6">
-              <Card className="glass-card p-6">
+            <div className="space-y-4">
+              <Card className="glass-card p-4">
                 <h2 className="text-lg font-semibold mb-4">Platforms</h2>
                 <FormField
                   control={form.control}
@@ -232,6 +232,7 @@ export default function CreatePost() {
               </Card>
 
               <Card className="glass-card p-6">
+              <Card className="glass-card p-4">
                 <div className="space-y-3">
                   <Button
                     type="button"

@@ -7,6 +7,15 @@ import { requireAuth } from "./auth";
 import type { User } from "@shared/schema";
 import { publishPost, processScheduledPosts, validatePostForPlatform } from "./publisher";
 import { generateSuggestions, getPlatformTips } from "./suggestions";
+import {
+  getAuthorizationUrl,
+  exchangeCodeForToken,
+  refreshAccessToken,
+  fetchUserProfile,
+  getConfiguredPlatforms,
+  validatePlatformConfig
+} from "./oauth";
+import { randomBytes } from "crypto";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication Routes
@@ -901,6 +910,234 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Approval Workflow Routes
+  // Request approval for a post
+  app.post("/api/posts/:id/request-approval", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { id } = req.params;
+
+      const post = await storage.getPost(id);
+      if (!post) {
+        return res.status(404).json({
+          error: "Post not found",
+          message: "The requested post does not exist"
+        });
+      }
+
+      if (post.userId !== user.id) {
+        return res.status(403).json({
+          error: "Access denied",
+          message: "You do not have permission to modify this post"
+        });
+      }
+
+      const updatedPost = await storage.updatePost(id, {
+        status: 'pending_approval',
+        //@ts-ignore
+        approvalStatus: 'pending',
+      });
+
+      res.json({
+        message: "Approval requested successfully",
+        post: updatedPost,
+      });
+    } catch (error: any) {
+      console.error("Error requesting approval:", error);
+      res.status(500).json({
+        error: "Failed to request approval",
+        message: error.message || "An error occurred"
+      });
+    }
+  });
+
+  // Approve a post
+  app.post("/api/posts/:id/approve", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { id } = req.params;
+
+      const post = await storage.getPost(id);
+      if (!post) {
+        return res.status(404).json({
+          error: "Post not found",
+          message: "The requested post does not exist"
+        });
+      }
+
+      const updatedPost = await storage.updatePost(id, {
+        //@ts-ignore
+        approvalStatus: 'approved',
+        //@ts-ignore
+        approvedBy: user.id,
+        //@ts-ignore
+        approvedAt: new Date(),
+        status: 'scheduled', // Move to scheduled after approval
+      });
+
+      res.json({
+        message: "Post approved successfully",
+        post: updatedPost,
+      });
+    } catch (error: any) {
+      console.error("Error approving post:", error);
+      res.status(500).json({
+        error: "Failed to approve post",
+        message: error.message || "An error occurred"
+      });
+    }
+  });
+
+  // Reject a post
+  app.post("/api/posts/:id/reject", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { id } = req.params;
+      const { reason } = req.body;
+
+      const post = await storage.getPost(id);
+      if (!post) {
+        return res.status(404).json({
+          error: "Post not found",
+          message: "The requested post does not exist"
+        });
+      }
+
+      const updatedPost = await storage.updatePost(id, {
+        //@ts-ignore
+        approvalStatus: 'rejected',
+        //@ts-ignore
+        approvedBy: user.id,
+        //@ts-ignore
+        approvedAt: new Date(),
+        //@ts-ignore
+        rejectionReason: reason || 'No reason provided',
+        status: 'draft', // Move back to draft after rejection
+      });
+
+      res.json({
+        message: "Post rejected",
+        post: updatedPost,
+      });
+    } catch (error: any) {
+      console.error("Error rejecting post:", error);
+      res.status(500).json({
+        error: "Failed to reject post",
+        message: error.message || "An error occurred"
+      });
+    }
+  });
+
+  // Get comments for a post
+  app.get("/api/posts/:id/comments", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const post = await storage.getPost(id);
+      if (!post) {
+        return res.status(404).json({
+          error: "Post not found",
+          message: "The requested post does not exist"
+        });
+      }
+
+      const comments = await storage.getPostComments(id);
+
+      // Fetch user details for each comment
+      const commentsWithUsers = await Promise.all(
+        comments.map(async (comment) => {
+          const commentUser = await storage.getUser(comment.userId);
+          return {
+            ...comment,
+            user: commentUser ? {
+              id: commentUser.id,
+              name: commentUser.name,
+              username: commentUser.username,
+              avatar: commentUser.avatar,
+            } : null,
+          };
+        })
+      );
+
+      res.json({ comments: commentsWithUsers });
+    } catch (error: any) {
+      console.error("Error fetching comments:", error);
+      res.status(500).json({
+        error: "Failed to fetch comments",
+        message: error.message || "An error occurred"
+      });
+    }
+  });
+
+  // Add a comment to a post
+  app.post("/api/posts/:id/comments", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { id } = req.params;
+      const { comment } = req.body;
+
+      if (!comment || !comment.trim()) {
+        return res.status(400).json({
+          error: "Missing comment",
+          message: "Comment text is required"
+        });
+      }
+
+      const post = await storage.getPost(id);
+      if (!post) {
+        return res.status(404).json({
+          error: "Post not found",
+          message: "The requested post does not exist"
+        });
+      }
+
+      const newComment = await storage.createComment(id, user.id, comment);
+
+      res.json({
+        message: "Comment added successfully",
+        comment: {
+          ...newComment,
+          user: {
+            id: user.id,
+            name: user.name,
+            username: user.username,
+            avatar: user.avatar,
+          },
+        },
+      });
+    } catch (error: any) {
+      console.error("Error adding comment:", error);
+      res.status(500).json({
+        error: "Failed to add comment",
+        message: error.message || "An error occurred"
+      });
+    }
+  });
+
+  // Delete a comment
+  app.delete("/api/comments/:id", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const success = await storage.deleteComment(id);
+
+      if (!success) {
+        return res.status(404).json({
+          error: "Comment not found",
+          message: "The requested comment does not exist"
+        });
+      }
+
+      res.json({ message: "Comment deleted successfully" });
+    } catch (error: any) {
+      console.error("Error deleting comment:", error);
+      res.status(500).json({
+        error: "Failed to delete comment",
+        message: error.message || "An error occurred"
+      });
+    }
+  });
+
   // Smart Suggestions API
   app.post("/api/suggestions", requireAuth, async (req, res) => {
     try {
@@ -941,6 +1178,311 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error fetching platform tips:", error);
       res.status(500).json({
         error: "Failed to fetch platform tips",
+        message: error.message || "An error occurred"
+      });
+    }
+  });
+
+  // ==========================================
+  // SOCIAL ACCOUNT OAUTH ROUTES
+  // ==========================================
+
+  // Get all connected social accounts for current user
+  app.get("/api/social/accounts", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const accounts = await storage.getUserSocialAccounts(user.id);
+
+      // Remove sensitive tokens from response
+      const sanitizedAccounts = accounts.map(account => ({
+        ...account,
+        accessToken: undefined,
+        refreshToken: undefined,
+      }));
+
+      res.json({ accounts: sanitizedAccounts });
+    } catch (error: any) {
+      console.error("Error fetching social accounts:", error);
+      res.status(500).json({
+        error: "Failed to fetch accounts",
+        message: error.message || "An error occurred"
+      });
+    }
+  });
+
+  // Get configured platforms (platforms that have API keys set up)
+  app.get("/api/social/platforms", requireAuth, async (req, res) => {
+    try {
+      const platforms = getConfiguredPlatforms();
+      res.json({ platforms });
+    } catch (error: any) {
+      console.error("Error fetching configured platforms:", error);
+      res.status(500).json({
+        error: "Failed to fetch platforms",
+        message: error.message || "An error occurred"
+      });
+    }
+  });
+
+  // Initiate OAuth flow for a platform
+  app.get("/api/social/oauth/:platform/connect", requireAuth, async (req, res) => {
+    try {
+      const { platform } = req.params;
+      const user = req.user as User;
+
+      // Validate platform is configured
+      if (!validatePlatformConfig(platform)) {
+        return res.status(400).json({
+          error: "Platform not configured",
+          message: `OAuth credentials for ${platform} are not configured. Please check your environment variables.`
+        });
+      }
+
+      // Generate state token to prevent CSRF attacks
+      // State contains: userId|timestamp|randomBytes
+      const stateData = {
+        userId: user.id,
+        timestamp: Date.now(),
+        nonce: randomBytes(16).toString('hex')
+      };
+      const state = Buffer.from(JSON.stringify(stateData)).toString('base64');
+
+      // Store state in session for verification
+      if (!req.session.oauthStates) {
+        req.session.oauthStates = {};
+      }
+      req.session.oauthStates[platform] = state;
+
+      // Generate authorization URL
+      const authUrl = getAuthorizationUrl(platform, state);
+
+      if (!authUrl) {
+        return res.status(500).json({
+          error: "Failed to generate auth URL",
+          message: "Could not create authorization URL for this platform"
+        });
+      }
+
+      res.json({ authUrl });
+    } catch (error: any) {
+      console.error("Error initiating OAuth:", error);
+      res.status(500).json({
+        error: "OAuth initiation failed",
+        message: error.message || "An error occurred"
+      });
+    }
+  });
+
+  // OAuth callback handler
+  app.get("/api/social/oauth/:platform/callback", async (req, res) => {
+    try {
+      const { platform } = req.params;
+      const { code, state, error, error_description } = req.query;
+
+      // Check for OAuth errors
+      if (error) {
+        console.error(`OAuth error for ${platform}:`, error, error_description);
+        return res.redirect(`/accounts?error=${encodeURIComponent(error_description as string || error as string)}`);
+      }
+
+      // Validate state to prevent CSRF
+      const storedState = req.session?.oauthStates?.[platform];
+      if (!storedState || storedState !== state) {
+        console.error("OAuth state mismatch - potential CSRF attack");
+        return res.redirect('/accounts?error=invalid_state');
+      }
+
+      // Decode and validate state
+      let stateData;
+      try {
+        stateData = JSON.parse(Buffer.from(state as string, 'base64').toString());
+      } catch (e) {
+        return res.redirect('/accounts?error=invalid_state');
+      }
+
+      // Check if state is recent (within 10 minutes)
+      const stateAge = Date.now() - stateData.timestamp;
+      if (stateAge > 10 * 60 * 1000) {
+        return res.redirect('/accounts?error=state_expired');
+      }
+
+      // Exchange code for tokens
+      const tokens = await exchangeCodeForToken(platform, code as string);
+
+      if (!tokens) {
+        return res.redirect('/accounts?error=token_exchange_failed');
+      }
+
+      // Fetch user profile
+      const profile = await fetchUserProfile(platform, tokens.accessToken);
+
+      if (!profile) {
+        return res.redirect('/accounts?error=profile_fetch_failed');
+      }
+
+      // Save account to database
+      await storage.createSocialAccount({
+        userId: stateData.userId,
+        platform,
+        accountName: profile.username,
+        accountId: profile.id,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken || null,
+        expiresAt: tokens.expiresAt || null,
+        profileData: profile
+      });
+
+      // Clear state from session
+      delete req.session.oauthStates[platform];
+
+      // Redirect to accounts page with success message
+      res.redirect('/accounts?success=true');
+    } catch (error: any) {
+      console.error("OAuth callback error:", error);
+      res.redirect(`/accounts?error=${encodeURIComponent(error.message || 'callback_failed')}`);
+    }
+  });
+
+  // Manually refresh tokens for an account
+  app.post("/api/social/accounts/:id/refresh", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const user = req.user as User;
+
+      // Get account and verify ownership
+      const account = await storage.getSocialAccount(id);
+
+      if (!account) {
+        return res.status(404).json({
+          error: "Account not found",
+          message: "The requested social account does not exist"
+        });
+      }
+
+      if (account.userId !== user.id) {
+        return res.status(403).json({
+          error: "Access denied",
+          message: "You do not have permission to refresh this account"
+        });
+      }
+
+      if (!account.refreshToken) {
+        return res.status(400).json({
+          error: "No refresh token",
+          message: "This account does not have a refresh token. Please reconnect the account."
+        });
+      }
+
+      // Refresh tokens
+      const newTokens = await refreshAccessToken(account.platform, account.refreshToken);
+
+      if (!newTokens) {
+        return res.status(500).json({
+          error: "Token refresh failed",
+          message: "Failed to refresh access token. Please reconnect the account."
+        });
+      }
+
+      // Update account in database
+      await storage.updateSocialAccount(id, {
+        accessToken: newTokens.accessToken,
+        refreshToken: newTokens.refreshToken || account.refreshToken,
+        expiresAt: newTokens.expiresAt || null
+      });
+
+      res.json({
+        message: "Tokens refreshed successfully",
+        expiresAt: newTokens.expiresAt
+      });
+    } catch (error: any) {
+      console.error("Error refreshing tokens:", error);
+      res.status(500).json({
+        error: "Token refresh failed",
+        message: error.message || "An error occurred"
+      });
+    }
+  });
+
+  // Disconnect/delete a social account
+  app.delete("/api/social/accounts/:id", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const user = req.user as User;
+
+      // Verify account exists and belongs to user
+      const account = await storage.getSocialAccount(id);
+
+      if (!account) {
+        return res.status(404).json({
+          error: "Account not found",
+          message: "The requested social account does not exist"
+        });
+      }
+
+      if (account.userId !== user.id) {
+        return res.status(403).json({
+          error: "Access denied",
+          message: "You do not have permission to delete this account"
+        });
+      }
+
+      // Delete account
+      await storage.deleteSocialAccount(id);
+
+      res.json({ message: "Account disconnected successfully" });
+    } catch (error: any) {
+      console.error("Error deleting social account:", error);
+      res.status(500).json({
+        error: "Failed to disconnect account",
+        message: error.message || "An error occurred"
+      });
+    }
+  });
+
+  // Toggle account active status
+  app.patch("/api/social/accounts/:id/toggle", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const user = req.user as User;
+
+      // Verify account exists and belongs to user
+      const account = await storage.getSocialAccount(id);
+
+      if (!account) {
+        return res.status(404).json({
+          error: "Account not found",
+          message: "The requested social account does not exist"
+        });
+      }
+
+      if (account.userId !== user.id) {
+        return res.status(403).json({
+          error: "Access denied",
+          message: "You do not have permission to modify this account"
+        });
+      }
+
+      // Toggle active status
+      const updatedAccount = await storage.updateSocialAccount(id, {
+        userId: account.userId,
+        platform: account.platform,
+        accountName: account.accountName,
+        accountId: account.accountId,
+        accessToken: account.accessToken,
+        profileData: {
+          ...account.profileData,
+          isActive: !account.isActive
+        }
+      });
+
+      res.json({
+        message: "Account status updated",
+        isActive: updatedAccount?.isActive
+      });
+    } catch (error: any) {
+      console.error("Error toggling account status:", error);
+      res.status(500).json({
+        error: "Failed to update account",
         message: error.message || "An error occurred"
       });
     }

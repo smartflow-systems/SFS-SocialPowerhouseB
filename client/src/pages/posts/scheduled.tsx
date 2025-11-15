@@ -73,6 +73,10 @@ export default function ScheduledPosts() {
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold mb-2 flex items-center gap-2" data-testid="heading-scheduled">
+      <div className="space-y-4">
+        {/* Header */}
+        <div>
+          <h1 className="text-2xl font-bold text-sfs-gold mb-2 flex items-center gap-2">
             <Clock className="w-8 h-8 text-primary" />
             Scheduled Posts
           </h1>
@@ -123,6 +127,19 @@ export default function ScheduledPosts() {
                           : 'No schedule set'}
                       </span>
                     </div>
+        {/* Scheduled Posts List */}
+        <div className="space-y-4">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Card key={i} className="glass-card p-4">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="px-2 py-1 bg-primary/20 text-primary text-xs rounded-full">
+                      Facebook
+                    </span>
+                    <span className="px-2 py-1 bg-primary/20 text-primary text-xs rounded-full">
+                      Instagram
+                    </span>
                   </div>
                   <div className="flex gap-2">
                     <Button

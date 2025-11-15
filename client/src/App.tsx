@@ -30,6 +30,11 @@ import Integrations from "@/pages/connections/integrations";
 import Automation from "@/pages/connections/automation";
 import Alerts from "@/pages/connections/alerts";
 
+// Team & Approval Pages
+import AccountsPage from "@/pages/accounts/index";
+import TeamPage from "@/pages/team/index";
+import ApprovalsPage from "@/pages/approvals/index";
+
 // Settings Pages
 import Profile from "@/pages/settings/profile";
 import Billing from "@/pages/settings/billing";
@@ -82,6 +87,11 @@ function Router() {
       <Route path="/connections/integrations" component={Integrations} />
       <Route path="/connections/automation" component={Automation} />
       <Route path="/connections/alerts" component={Alerts} />
+
+      {/* Team & Collaboration Routes */}
+      <Route path="/accounts" component={AccountsPage} />
+      <Route path="/team" component={TeamPage} />
+      <Route path="/approvals" component={ApprovalsPage} />
 
       {/* Settings Routes */}
       <Route path="/settings/profile" component={Profile} />

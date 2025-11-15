@@ -1,10 +1,24 @@
 import { type User, type InsertUser, type Post, type AITemplate, type TeamMember, type InsertTeamMember, type Team, type InsertTeam, type SocialAccount, type InsertSocialAccount, type UserPreferences, type InsertUserPreferences, users, posts, aiTemplates, teamMembers, teams, socialAccounts, userPreferences } from "@shared/schema";
+import {
+  type User,
+  type InsertUser,
+  type Post,
+  type AITemplate,
+  type PostComment,
+  type SocialAccount,
+  users,
+  posts,
+  aiTemplates,
+  postComments,
+  socialAccounts
+} from "@shared/schema";
 import { randomUUID } from "crypto";
 import bcrypt from "bcrypt";
 import { drizzle } from "drizzle-orm/neon-serverless";
 import { Pool, neonConfig } from "@neondatabase/serverless";
 import { eq, and, gte, lte, sql as sqlDrizzle, or } from "drizzle-orm";
 import ws from "ws";
+import { encrypt, decrypt } from "./encryption";
 
 // Configure Neon to use WebSocket for Node.js
 neonConfig.webSocketConstructor = ws;
@@ -32,6 +46,17 @@ export interface InsertAITemplate {
   tone: string;
   category?: string;
   isPublic?: boolean;
+}
+
+export interface InsertSocialAccount {
+  userId: string;
+  platform: string;
+  accountName: string;
+  accountId: string;
+  accessToken: string;
+  refreshToken?: string | null;
+  expiresAt?: Date | null;
+  profileData?: any;
 }
 
 export interface IStorage {
@@ -82,6 +107,19 @@ export interface IStorage {
   getUserPreferences(userId: string): Promise<UserPreferences | undefined>;
   upsertUserPreferences(prefs: Omit<InsertUserPreferences, 'id'>): Promise<UserPreferences>;
   updateProfile(userId: string, updates: { name?: string; email?: string; avatar?: string }): Promise<User | undefined>;
+  // Comment methods
+  getPostComments(postId: string): Promise<PostComment[]>;
+  createComment(postId: string, userId: string, comment: string): Promise<PostComment>;
+  deleteComment(id: string): Promise<boolean>;
+
+  // Social Account methods
+  getSocialAccount(id: string): Promise<SocialAccount | undefined>;
+  getUserSocialAccounts(userId: string): Promise<SocialAccount[]>;
+  getUserSocialAccountsByPlatform(userId: string, platform: string): Promise<SocialAccount[]>;
+  createSocialAccount(account: InsertSocialAccount): Promise<SocialAccount>;
+  updateSocialAccount(id: string, updates: Partial<InsertSocialAccount>): Promise<SocialAccount | undefined>;
+  deleteSocialAccount(id: string): Promise<boolean>;
+  getAccountsNeedingRefresh(): Promise<SocialAccount[]>;
 }
 
 // PostgreSQL Database Storage Implementation
@@ -268,7 +306,7 @@ export class DbStorage implements IStorage {
 
   async incrementTemplateUsage(id: string): Promise<void> {
     await this.db.update(aiTemplates)
-      .set({ 
+      .set({
         usageCount: sqlDrizzle`${aiTemplates.usageCount} + 1`,
         updatedAt: new Date()
       })
@@ -360,6 +398,116 @@ export class DbStorage implements IStorage {
       .where(eq(socialAccounts.id, id))
       .returning();
     return result[0];
+  // Comment methods
+  async getPostComments(postId: string): Promise<PostComment[]> {
+    const result = await this.db.select()
+      .from(postComments)
+      .where(eq(postComments.postId, postId))
+      .orderBy(postComments.createdAt);
+    return result;
+  }
+
+  async createComment(postId: string, userId: string, comment: string): Promise<PostComment> {
+    const result = await this.db.insert(postComments).values({
+      postId,
+      userId,
+      comment,
+    }).returning();
+    return result[0];
+  }
+
+  async deleteComment(id: string): Promise<boolean> {
+    const result = await this.db.delete(postComments).where(eq(postComments.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Social Account methods with encryption
+  async getSocialAccount(id: string): Promise<SocialAccount | undefined> {
+    const result = await this.db.select()
+      .from(socialAccounts)
+      .where(eq(socialAccounts.id, id))
+      .limit(1);
+
+    if (!result[0]) {
+      return undefined;
+    }
+
+    // Decrypt tokens before returning
+    return this.decryptSocialAccountTokens(result[0]);
+  }
+
+  async getUserSocialAccounts(userId: string): Promise<SocialAccount[]> {
+    const result = await this.db.select()
+      .from(socialAccounts)
+      .where(eq(socialAccounts.userId, userId))
+      .orderBy(socialAccounts.createdAt);
+
+    // Decrypt tokens for all accounts
+    return result.map(account => this.decryptSocialAccountTokens(account));
+  }
+
+  async getUserSocialAccountsByPlatform(userId: string, platform: string): Promise<SocialAccount[]> {
+    const result = await this.db.select()
+      .from(socialAccounts)
+      .where(
+        and(
+          eq(socialAccounts.userId, userId),
+          eq(socialAccounts.platform, platform)
+        )
+      )
+      .orderBy(socialAccounts.createdAt);
+
+    // Decrypt tokens for all accounts
+    return result.map(account => this.decryptSocialAccountTokens(account));
+  }
+
+  async createSocialAccount(insertAccount: InsertSocialAccount): Promise<SocialAccount> {
+    // Encrypt tokens before storing
+    const encryptedAccessToken = encrypt(insertAccount.accessToken);
+    const encryptedRefreshToken = insertAccount.refreshToken ? encrypt(insertAccount.refreshToken) : null;
+
+    const result = await this.db.insert(socialAccounts).values({
+      userId: insertAccount.userId,
+      platform: insertAccount.platform,
+      accountName: insertAccount.accountName,
+      accountId: insertAccount.accountId,
+      accessToken: encryptedAccessToken,
+      refreshToken: encryptedRefreshToken,
+      expiresAt: insertAccount.expiresAt || null,
+      profileData: insertAccount.profileData || null,
+      isActive: true,
+    }).returning();
+
+    // Return with decrypted tokens
+    return this.decryptSocialAccountTokens(result[0]);
+  }
+
+  async updateSocialAccount(id: string, updates: Partial<InsertSocialAccount>): Promise<SocialAccount | undefined> {
+    // Encrypt tokens if they're being updated
+    const encryptedUpdates: any = { ...updates };
+
+    if (updates.accessToken) {
+      encryptedUpdates.accessToken = encrypt(updates.accessToken);
+    }
+
+    if (updates.refreshToken !== undefined) {
+      encryptedUpdates.refreshToken = updates.refreshToken ? encrypt(updates.refreshToken) : null;
+    }
+
+    const result = await this.db.update(socialAccounts)
+      .set({
+        ...encryptedUpdates,
+        updatedAt: new Date()
+      })
+      .where(eq(socialAccounts.id, id))
+      .returning();
+
+    if (!result[0]) {
+      return undefined;
+    }
+
+    // Return with decrypted tokens
+    return this.decryptSocialAccountTokens(result[0]);
   }
 
   async deleteSocialAccount(id: string): Promise<boolean> {
@@ -390,6 +538,41 @@ export class DbStorage implements IStorage {
       .where(eq(users.id, userId))
       .returning();
     return result[0];
+  async getAccountsNeedingRefresh(): Promise<SocialAccount[]> {
+    // Get accounts that expire within 24 hours
+    const tomorrow = new Date();
+    tomorrow.setHours(tomorrow.getHours() + 24);
+
+    const result = await this.db.select()
+      .from(socialAccounts)
+      .where(
+        and(
+          eq(socialAccounts.isActive, true),
+          lte(socialAccounts.expiresAt, tomorrow)
+        )
+      )
+      .orderBy(socialAccounts.expiresAt);
+
+    // Decrypt tokens for all accounts
+    return result.map(account => this.decryptSocialAccountTokens(account));
+  }
+
+  /**
+   * Helper method to decrypt tokens in a social account
+   */
+  private decryptSocialAccountTokens(account: SocialAccount): SocialAccount {
+    try {
+      return {
+        ...account,
+        accessToken: decrypt(account.accessToken),
+        refreshToken: account.refreshToken ? decrypt(account.refreshToken) : null,
+      };
+    } catch (error) {
+      // If decryption fails, log error but return account with encrypted tokens
+      // This prevents breaking the entire app if there's an encryption key issue
+      console.error(`Failed to decrypt tokens for social account ${account.id}:`, error);
+      return account;
+    }
   }
 }
 
@@ -401,6 +584,8 @@ export class MemStorage implements IStorage {
   private teamMembers: Map<string, TeamMember>;
   private socialAccounts: Map<string, SocialAccount>;
   private userPrefs: Map<string, UserPreferences>;
+  private comments: Map<string, PostComment>;
+  private socialAccounts: Map<string, SocialAccount>;
 
   constructor() {
     this.users = new Map();
@@ -410,6 +595,8 @@ export class MemStorage implements IStorage {
     this.teamMembers = new Map();
     this.socialAccounts = new Map();
     this.userPrefs = new Map();
+    this.comments = new Map();
+    this.socialAccounts = new Map();
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -548,6 +735,10 @@ export class MemStorage implements IStorage {
       scheduledAt: insertPost.scheduledAt || null,
       publishedAt: insertPost.publishedAt || null,
       status: insertPost.status || 'draft',
+      approvalStatus: null,
+      approvedBy: null,
+      approvedAt: null,
+      rejectionReason: null,
       aiGenerated: insertPost.aiGenerated || false,
       tone: insertPost.tone || null,
       hashtags: insertPost.hashtags || null,
@@ -771,6 +962,105 @@ export class MemStorage implements IStorage {
     const updated = { ...user, ...updates, updatedAt: new Date() };
     this.users.set(userId, updated);
     return updated;
+  // Comment methods
+  async getPostComments(postId: string): Promise<PostComment[]> {
+    return Array.from(this.comments.values())
+      .filter((comment) => comment.postId === postId)
+      .sort((a, b) => a.createdAt!.getTime() - b.createdAt!.getTime()); // Oldest first
+  }
+
+  async createComment(postId: string, userId: string, comment: string): Promise<PostComment> {
+    const id = randomUUID();
+    const now = new Date();
+    const newComment: PostComment = {
+      id,
+      postId,
+      userId,
+      comment,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.comments.set(id, newComment);
+    return newComment;
+  }
+
+  async deleteComment(id: string): Promise<boolean> {
+    return this.comments.delete(id);
+  }
+
+  // Social Account methods (in-memory, no encryption needed for testing)
+  async getSocialAccount(id: string): Promise<SocialAccount | undefined> {
+    return this.socialAccounts.get(id);
+  }
+
+  async getUserSocialAccounts(userId: string): Promise<SocialAccount[]> {
+    return Array.from(this.socialAccounts.values())
+      .filter((account) => account.userId === userId)
+      .sort((a, b) => a.createdAt!.getTime() - b.createdAt!.getTime());
+  }
+
+  async getUserSocialAccountsByPlatform(userId: string, platform: string): Promise<SocialAccount[]> {
+    return Array.from(this.socialAccounts.values())
+      .filter((account) => account.userId === userId && account.platform === platform)
+      .sort((a, b) => a.createdAt!.getTime() - b.createdAt!.getTime());
+  }
+
+  async createSocialAccount(insertAccount: InsertSocialAccount): Promise<SocialAccount> {
+    const id = randomUUID();
+    const now = new Date();
+    const account: SocialAccount = {
+      id,
+      userId: insertAccount.userId,
+      platform: insertAccount.platform,
+      accountName: insertAccount.accountName,
+      accountId: insertAccount.accountId,
+      accessToken: insertAccount.accessToken,
+      refreshToken: insertAccount.refreshToken || null,
+      expiresAt: insertAccount.expiresAt || null,
+      profileData: insertAccount.profileData || null,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.socialAccounts.set(id, account);
+    return account;
+  }
+
+  async updateSocialAccount(id: string, updates: Partial<InsertSocialAccount>): Promise<SocialAccount | undefined> {
+    const account = this.socialAccounts.get(id);
+    if (!account) {
+      return undefined;
+    }
+
+    const updatedAccount: SocialAccount = {
+      ...account,
+      ...updates,
+      updatedAt: new Date(),
+    };
+
+    this.socialAccounts.set(id, updatedAccount);
+    return updatedAccount;
+  }
+
+  async deleteSocialAccount(id: string): Promise<boolean> {
+    return this.socialAccounts.delete(id);
+  }
+
+  async getAccountsNeedingRefresh(): Promise<SocialAccount[]> {
+    const tomorrow = new Date();
+    tomorrow.setHours(tomorrow.getHours() + 24);
+
+    return Array.from(this.socialAccounts.values())
+      .filter((account) =>
+        account.isActive &&
+        account.expiresAt &&
+        account.expiresAt <= tomorrow
+      )
+      .sort((a, b) => {
+        const aTime = a.expiresAt?.getTime() || 0;
+        const bTime = b.expiresAt?.getTime() || 0;
+        return aTime - bTime;
+      });
   }
 }
 
