@@ -41,23 +41,28 @@ const accountsItems = [
   { icon: Target, label: "Competitors", path: "/competitor-intelligence" },
   { icon: Zap, label: "Automation", path: "/automation" },
   { icon: Bell, label: "Alerts", path: "/alerts" },
+  { icon: Globe, label: "Social Accounts", path: "/connections/social-accounts" },
+  { icon: Zap, label: "Automation", path: "/connections/automation" },
+  { icon: Bell, label: "Alerts", path: "/connections/alerts" },
 ];
 
 const settingsItems = [
+  { icon: Users, label: "Team", path: "/connections/team" },
+  { icon: Settings, label: "Settings", path: "/settings/preferences" },
+  { icon: CreditCard, label: "Billing", path: "/settings/billing" },
   { icon: Users, label: "Team", path: "/team" },
   { icon: CheckCircle, label: "Approvals", path: "/approvals" },
   { icon: Settings, label: "Settings", path: "/settings" },
   { icon: CreditCard, label: "Billing", path: "/billing" },
   { icon: HelpCircle, label: "Help", path: "/help" },
 ];
+import GitHubSidebar from '@/components/GitHubSidebar';
 
 interface DashboardLayoutProps {
   children: ReactNode;
 }
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
-  const [location] = useLocation();
-
   return (
     <>
       {/* Circuit Background - Fixed to viewport */}
@@ -161,5 +166,19 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       </SidebarInset>
     </SidebarProvider>
     </>
+    <div className="min-h-screen bg-background relative">
+      {/* Circuit Background */}
+      <div className="circuit-bg" />
+
+      {/* GitHub-style Sidebar */}
+      <GitHubSidebar />
+
+      {/* Main Content */}
+      <main className="relative z-10 pt-20 px-5">
+        <div className="max-w-7xl mx-auto">
+          {children}
+        </div>
+      </main>
+    </div>
   );
 }
