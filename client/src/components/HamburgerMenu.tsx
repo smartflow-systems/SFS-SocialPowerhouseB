@@ -233,26 +233,21 @@ export default function HamburgerMenu({ className }: HamburgerMenuProps) {
                         key={item.id}
                         href={item.href}
                         onClick={handleLinkClick}
+                        className={cn(
+                          "flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-all group relative overflow-hidden",
+                          active
+                            ? "bg-sfs-gold/20 text-sfs-gold border-l-2 border-sfs-gold"
+                            : "text-sfs-beige/70 hover:bg-sfs-gold/10 hover:text-sfs-gold"
+                        )}
                       >
-                        <a
-                          className={cn(
-                            "flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-all group relative overflow-hidden",
-                            active
-                              ? "bg-sfs-gold/20 text-sfs-gold border-l-2 border-sfs-gold"
-                              : "text-sfs-beige/70 hover:bg-sfs-gold/10 hover:text-sfs-gold"
-                          )}
-                        >
-                          {/* Hover shimmer effect */}
-                          <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-sfs-gold/10 to-transparent" />
-
-                          <Icon className={cn("h-5 w-5 flex-shrink-0", active ? "text-sfs-gold" : "")} />
-                          <span className="font-medium text-sm relative z-10">{item.label}</span>
-                          {item.badge && (
-                            <span className="ml-auto text-xs bg-sfs-gold text-sfs-black px-2 py-0.5 rounded-full font-semibold">
-                              {item.badge}
-                            </span>
-                          )}
-                        </a>
+                        <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-sfs-gold/10 to-transparent" />
+                        <Icon className={cn("h-5 w-5 flex-shrink-0", active ? "text-sfs-gold" : "")} />
+                        <span className="font-medium text-sm relative z-10">{item.label}</span>
+                        {item.badge && (
+                          <span className="ml-auto text-xs bg-sfs-gold text-sfs-black px-2 py-0.5 rounded-full font-semibold">
+                            {item.badge}
+                          </span>
+                        )}
                       </Link>
                     );
                   })}
