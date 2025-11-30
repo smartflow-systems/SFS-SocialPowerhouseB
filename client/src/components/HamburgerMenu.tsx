@@ -155,7 +155,7 @@ export default function HamburgerMenu({ className }: HamburgerMenuProps) {
       {/* Slide-in Sidebar */}
       <div
         className={cn(
-          "fixed top-0 left-0 h-full w-80 z-50",
+          "fixed top-0 left-0 h-full w-56 z-50",
           "bg-sfs-brown/95 backdrop-blur-xl border-r border-sfs-gold/30",
           "transform transition-transform duration-300 ease-in-out",
           "shadow-2xl shadow-sfs-gold/10",
