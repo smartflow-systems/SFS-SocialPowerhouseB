@@ -2,6 +2,29 @@
 
 This guide explains how to add the SFS design system to any of your Replit apps so they all have the same look and feel.
 
+---
+
+## 🚀 ULTRA QUICK - Choose Your Method
+
+### Method 1: Auto Script (Easiest - 30 seconds)
+```bash
+cd /path/to/your/new-app
+bash ../sfs-socialpowerhouse/sfs-design-kit/setup.sh
+```
+✅ Copies everything automatically. Done!
+
+### Method 2: Replit Copy-Paste (Super Easy - 1 minute)
+1. Open **SFS Social PowerHouse** project
+2. Right-click `sfs-design-kit` folder → **Copy**
+3. Switch to your other app
+4. Right-click root folder → **Paste**
+5. Done!
+
+### Method 3: Manual Copy (Traditional - 5 minutes)
+Follow "Quick Setup" section below if you prefer step-by-step.
+
+---
+
 ## Quick Setup (5 minutes)
 
 ### Step 1: Copy the Design Kit Folder
