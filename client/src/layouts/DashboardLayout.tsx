@@ -4,13 +4,14 @@ import {
   Home, Sparkles, Calendar, BarChart3, Users, Settings,
   Zap, Bell, CreditCard, HelpCircle, FileText, Globe, 
   CheckCircle, Activity, TrendingUp, Inbox, Ear, Target, 
-  Wand2, Menu, X, ChevronDown
+  Wand2, Menu, X, ChevronDown, MessageSquare
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 const mainItems = [
   { icon: Home, label: "Dashboard", path: "/dashboard" },
+  { icon: MessageSquare, label: "AI Assistant", path: "/chat" },
   { icon: Activity, label: "Live Dashboard", path: "/live-dashboard" },
   { icon: Inbox, label: "Social Inbox", path: "/social-inbox" },
   { icon: Sparkles, label: "AI Studio", path: "/ai-studio" },
