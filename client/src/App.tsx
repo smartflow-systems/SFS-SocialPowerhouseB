@@ -54,6 +54,9 @@ import Scheduler from "@/pages/scheduler/index";
 // Help
 import Help from "@/pages/help/index";
 
+// Chat
+import ChatUI from "@/pages/chat/index";
+
 function Router() {
   return (
     <Switch>
@@ -115,6 +118,9 @@ function Router() {
 
       {/* Help Route */}
       <Route path="/help" component={Help} />
+
+      {/* Chat Route */}
+      <Route path="/chat" component={ChatUI} />
 
       {/* Catch all - 404 */}
       <Route component={NotFound} />
