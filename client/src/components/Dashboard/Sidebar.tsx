@@ -27,6 +27,7 @@ const sidebarSections: SidebarSection[] = [
     title: "CORE",
     items: [
       { icon: Home, label: "Dashboard", path: "/dashboard" },
+      { icon: MessageSquare, label: "AI Assistant", path: "/chat", badge: "NEW" },
       { icon: Sparkles, label: "AI Studio", path: "/ai-studio" },
       { icon: Calendar, label: "Content Calendar", path: "/calendar" },
       { icon: BarChart3, label: "Analytics", path: "/analytics" },

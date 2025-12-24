@@ -6,10 +6,6 @@ expertMode = true
 localPort = 5000
 externalPort = 80
 
-[[ports]]
-localPort = 46049
-externalPort = 3000
-
 [workflows]
 runButton = "Project"
 
@@ -55,3 +51,13 @@ waitForPort = 5000
 [nix]
 packages = ["gh"]
 channel = "stable-25_05"
+
+[deployment]
+deploymentTarget = "autoscale"
+run = ["npm", "start"]
+build = ["npm", "run", "build"]
+
+[userenv]
+
+[userenv.production]
+NODE_ENV = "production"
