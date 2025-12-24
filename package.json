@@ -5,9 +5,9 @@
   "main": "server/index.ts",
   "private": true,
   "scripts": {
-    "start": "tsx server/index.ts",
-    "dev": "tsx server/index.ts",
-    "build": "echo 'build complete' && exit 0",
+    "start": "NODE_ENV=production tsx server/index.ts",
+    "dev": "NODE_ENV=development tsx server/index.ts",
+    "build": "vite build",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
